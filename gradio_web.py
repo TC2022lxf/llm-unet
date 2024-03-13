@@ -1,11 +1,12 @@
 import gradio as gr
 import os
 import time
+import requests
 from utils.llm import load_llm
 from utils.unet import predict
 
 
-#llm = load_llm()
+llm = load_llm()
 
 def print_like_dislike(x: gr.LikeData):
     print(x.index, x.value, x.liked)
@@ -27,27 +28,29 @@ def add_file(history, file):
     print(history)
     return history
 
+def is_TF(pt):
+    pt = """如果以下的问题不是要求返回文字回答而是要求返回其他类型，如图片、表格等信息的话，请你回复“True”，否则回复“False”，请你一定要准许这个回复规则，我只想在你的回答中看到一次True或者一次False，不可以都同时出现。
+    问题：
+    """+pt
+    pt = pt+"答案(True or False):"
+    response = llm.invoke(pt)
+    return response
 
 def bot(history):
-    response = history[-1][0]
-    #response = llm.invoke(response)
-    response = "1231231231"
-    history[-1][1] = ""
-    for character in response:
-        history[-1][1] += character
-        time.sleep(0.05)
-        yield history
+    question = history[-1][0]
+    if isinstance(question, tuple):
+        if os.path.exists(question[0]):
+            print(question[0])
+            question = prompt(question[0])
+    if "True" in is_TF(question):
+        history[-1][1]=("R-C.jpg",)
+        print()
 
-def bot1(history):
-    response = prompt(history[-1][0])
-    print(response)
-    #response = llm.invoke(response)
-    response = "1231231231"
-    history[-1][1] = ""
-    for character in response:
-        history[-1][1] += character
-        time.sleep(0.05)
-        yield history
+    else:
+        response = llm.invoke(question)
+        history[-1][1] = response
+    return history
+
 
 with gr.Blocks() as demo:
     chatbot = gr.Chatbot(
@@ -71,7 +74,7 @@ with gr.Blocks() as demo:
     )
     txt_msg.then(lambda: gr.Textbox(interactive=True), None, [txt], queue=False)
     file_msg = btn.upload(add_file, [chatbot, btn], [chatbot], queue=False).then(
-        bot1, chatbot, chatbot
+        bot, chatbot, chatbot
     )
     # bt = gr.Button("📁")
     # file_msg1 = bt.click(add_file, [chatbot, btn], [chatbot], queue=False)
@@ -79,5 +82,5 @@ with gr.Blocks() as demo:
 
 
 demo.queue()
-demo.launch(share= True)
+demo.launch(share = True)
 
